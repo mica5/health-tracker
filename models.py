@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+import sys
+import os
 import datetime
 from contextlib import contextmanager
 
@@ -13,6 +15,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.schema import MetaData
 from sqlalchemy.orm import relationship
 
+this_dir = os.path.abspath(os.path.dirname(__file__))
+if this_dir not in sys.path:
+    sys.path.append(this_dir)
 from health_tracker_config import engine, schema_name
 
 
@@ -86,26 +91,35 @@ class Base:
 
     @classmethod
     @contextmanager
-    def get_session(cls):
+    def get_session(cls, sess=None):
         """
 
         Note that operations that create rows in
         multiple tables at once need to share
         the same session.
         """
-        if cls.Session is None:
-            raise Exception("session not set. must be set using Base.set_sess(sqlalchemy.orm.sessionmaker(bind=engine))")
-        sess = cls.Session()
+        if sess is None:
+            managed = True
+            if cls.Session is None:
+                raise Exception(
+                    "session not set. must be set using Base.set_sess(sqlalchemy.orm.sessionmaker(bind=engine))"
+                )
+            sess = cls.Session()
+        else:
+            managed = False
         try:
             yield sess
         except KeyboardInterrupt:
             raise
         except Exception:
+            # TODO not sure whether unmanaged session should be rolled back
             sess.rollback()
         else:
-            sess.commit()
+            if managed:
+                sess.commit()
         finally:
-            sess.close()
+            if managed:
+                sess.close()
 
     def __repr__(self):
         """Generic repr method for 
@@ -145,7 +159,12 @@ class Food(Base, SABase):
 
     @classmethod
     def get_row(cls, food_str, sess):
-        return super(Food, cls).get_row(cls.food, food_str, sess)
+        food = super(Food, cls).get_row(
+            col=cls.food,
+            value=food_str,
+            sess=sess,
+        )
+        return food
 
     def __repr__(self):
         return '{}(food={})'.format(
@@ -160,26 +179,42 @@ class Eat(Base, SABase):
     # primary key - "eat id"
     eid = pkey('eid', dtype=BigInteger)
 
+    # local columns
+    amount = Column('amount', Text)
+
     ### Foreign columns
 
     fid = Column('fid', Integer, ForeignKey('food.fid'))
     food = relationship('Food')
 
-    def __init__(self, food_str, time=None):
-        food = Food.get_row(food_str)
-        self.fid = food.fid
+    @classmethod
+    def create_entry(cls, food_str, amount_str=None, time=None, sess=None):
+        with cls.get_session(sess=sess) as sess:
+            eat = cls()
+            eat.amount = amount_str
+            eat.created_at = eat.modified_at = time or datetime.datetime.now()
 
-        if time is None:
-            time = datetime.datetime.now()
-        self.created_at = self.modified_at = time
+            food = Food.get_row(food_str, sess)
+            eat.fid = food.fid
+
+            sess.add(eat)
+            sess.commit()
+        return eat
 
     def __repr__(self):
-        return '{}(food_str={}, time={})'.format(
+        return '{}(food_str={}, amount_str={}, time={})'.format(
             self.__class__.__name__,
             *[repr(obj) for obj in [
                 self.food.food,
+                self.amount,
                 self.created_at,
             ]]
         )
     def __str__(self):
         return repr(self)
+
+if __name__ == '__main__':
+    import sqlalchemy
+    Base.set_sess(sqlalchemy.orm.sessionmaker(bind=engine))
+    with Base.get_session() as sess:
+        print(Eat.create_entry(food_str='hot chocolate', amount_str='1 cup', sess=sess))

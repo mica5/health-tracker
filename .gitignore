@@ -104,3 +104,4 @@ venv.bak/
 .mypy_cache/
 
 health_tracker_config.py
+commit_health_tracker.txt
