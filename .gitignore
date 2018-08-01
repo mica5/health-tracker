@@ -102,3 +102,5 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+health_tracker_config.py
