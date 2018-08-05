@@ -5,7 +5,7 @@ import datetime
 from contextlib import contextmanager
 
 from sqlalchemy import (
-    BigInteger, Text, Integer, DateTime, DECIMAL,
+    BigInteger, Text, Integer, DateTime, DECIMAL, BOOLEAN,
     ForeignKey,
     Column
 )
@@ -181,6 +181,7 @@ class Eat(Base, SABase):
 
     # local columns
     amount = Column('amount', Text)
+    deleted = Column('deleted', BOOLEAN, default=False, nullable=False)
 
     ### Foreign columns
 
@@ -217,4 +218,5 @@ if __name__ == '__main__':
     import sqlalchemy
     Base.set_sess(sqlalchemy.orm.sessionmaker(bind=engine))
     with Base.get_session() as sess:
-        print(Eat.create_entry(food_str='hot chocolate', amount_str='1 cup', sess=sess))
+        eat = Eat.create_entry(food_str='hot chocolate', amount_str='1 cup', sess=sess)
+        print(eat)
