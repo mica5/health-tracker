@@ -182,6 +182,7 @@ class Eat(Base, SABase):
     # local columns
     amount = Column('amount', Text)
     deleted = Column('deleted', BOOLEAN, default=False, nullable=False)
+    location = Column('location', Text, default=None)
 
     ### Foreign columns
 
@@ -189,11 +190,12 @@ class Eat(Base, SABase):
     food = relationship('Food')
 
     @classmethod
-    def create_entry(cls, food_str, amount_str=None, time=None, sess=None):
+    def create_entry(cls, food_str, amount_str=None, time=None, location_str=None, sess=None):
         with cls.get_session(sess=sess) as sess:
             eat = cls()
             eat.amount = amount_str
             eat.created_at = eat.modified_at = time or datetime.datetime.now()
+            eat.location = location_str
 
             food = Food.get_row(food_str, sess)
             eat.fid = food.fid
@@ -203,12 +205,13 @@ class Eat(Base, SABase):
         return eat
 
     def __repr__(self):
-        return '{}(food_str={}, amount_str={}, time={})'.format(
+        return '{}(food_str={}, amount_str={}, time={}, location_str={})'.format(
             self.__class__.__name__,
             *[repr(obj) for obj in [
                 self.food.food,
                 self.amount,
                 self.created_at,
+                self.location,
             ]]
         )
     def __str__(self):
@@ -218,5 +221,5 @@ if __name__ == '__main__':
     import sqlalchemy
     Base.set_sess(sqlalchemy.orm.sessionmaker(bind=engine))
     with Base.get_session() as sess:
-        eat = Eat.create_entry(food_str='hot chocolate', amount_str='1 cup', sess=sess)
+        eat = Eat.create_entry(food_str='hot chocolate', amount_str='1 cup', location_str='home', sess=sess)
         print(eat)
